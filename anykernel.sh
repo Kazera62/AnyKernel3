@@ -4,7 +4,7 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=by belowzeroiq @ github
+kernel.string=by KazeraKernel @ github
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -12,10 +12,7 @@ do.cleanup=1
 do.cleanuponabort=0
 device.name1=topaz
 device.name2=tapas
-device.name3=sapphiren
-device.name4=sapphire
-device.name5=
-supported.versions=11-15
+supported.versions=13-15
 supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
@@ -38,12 +35,12 @@ choose_kernel() {
   ui_print "Kernel Version Selection:"
   ui_print " "
   ui_print "  -EN"
-  ui_print "  Volume Up: non-KSU version"
-  ui_print "  Volume Down: KSU version"
+  ui_print "  Volume Up: non-KSU"
+  ui_print "  Volume Down: KSU"
   ui_print " "
   ui_print "  -ID"
-  ui_print "  Volume Atas: versi non-KSU"
-  ui_print "  Volume Bawah: versi KSU"
+  ui_print "  Volume Atas: non-KSU"
+  ui_print "  Volume Bawah: KSU"
   ui_print " "
   ui_print "Input: "
   ui_print " "
@@ -69,12 +66,12 @@ if [ -f "$AKHOME/Image.ksu" ] && [ -f "$AKHOME/Image.noksu" ]; then
   case $? in
     1)
       ui_print " "
-      ui_print "Selected: non-KSU Kernel"
+      ui_print "Selected: non-KSU^⁠_⁠^"
       mv -f "$AKHOME/Image.noksu" "$AKHOME/Image"
       ;;
     2)
       ui_print " "
-      ui_print "Selected: KSU Kernel"
+      ui_print "Selected: KSU^⁠_⁠^"
       mv -f "$AKHOME/Image.ksu" "$AKHOME/Image"
       ;;
   esac
