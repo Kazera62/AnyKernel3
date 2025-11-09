@@ -4,7 +4,7 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=by belowzeroiq @ github
+kernel.string=by Zenith
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -14,8 +14,6 @@ device.name1=topaz
 device.name2=tapas
 device.name3=sapphiren
 device.name4=sapphire
-device.name5=xun
-device.name6=creek
 supported.versions=13-16
 supported.patchlevels=
 supported.vendorpatchlevels=
