@@ -31,6 +31,21 @@ no_magisk_check=1
 # import functions/variables and setup patching - see for reference (DO NOT REMOVE)
 . tools/ak3-core.sh
 
+# == ZENITH ==
+ui_print " "
+ui_print " "
+ui_print "\033[1;31m███████╗███████╗███╗   ██╗██╗███╗   ██╗██╗████████╗██╗  ██╗\033[0m"
+ui_print "\033[1;31m██╔════╝██╔════╝████╗  ██║██║████╗  ██║██║╚══██╔══╝██║  ██║\033[0m"
+ui_print "\033[1;31m███████╗█████╗  ██╔██╗ ██║██║██╔██╗ ██║██║   ██║   ███████║\033[0m"
+ui_print "\033[1;31m╚════██║██╔══╝  ██║╚██╗██║██║██║╚██╗██║██║   ██║   ██╔══██║\033[0m"
+ui_print "\033[1;31m███████║███████╗██║ ╚████║██║██║ ╚████║██║   ██║   ██║  ██║\033[0m"
+ui_print "\033[1;31m╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝  ╚═╝\033[0m"
+ui_print " "
+ui_print "                   \033[1;37mZenith Kernel — Unleash the Power.\033[0m"
+ui_print " "
+
+sleep 0.5
+
 # Kernel selection function
 choose_kernel() {
   ui_print " "
@@ -95,3 +110,7 @@ else
     write_boot # use flash_boot to skip ramdisk repack, e.g. for devices with init_boot ramdisk
 fi
 ## end boot install
+
+ui_print " "
+ui_print "\033[1;31mInstallation Complete — Zenith Kernel Active.\033[0m"
+ui_print " "
