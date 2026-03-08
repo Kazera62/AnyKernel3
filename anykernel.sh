@@ -4,7 +4,7 @@
 ### AnyKernel setup
 # global properties
 properties() { '
-kernel.string=by Kazera @ github
+kernel.string=by Zenith @ github
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -38,7 +38,7 @@ choose_kernel() {
   ui_print " "
   ui_print "Kernel Version Selection:"
   ui_print " "
-  ui_print "  VOL + : non-KSU"
+  ui_print "  VOL + : noKSU"
   ui_print "  VOL - : KSU"
   ui_print " "
   ui_print "Waiting for input... "
@@ -65,12 +65,12 @@ if [ -f "$AKHOME/Image.ksu" ] && [ -f "$AKHOME/Image.noksu" ]; then
   case $? in
     1)
       ui_print " "
-      ui_print "Selected: non-KSU Kernel"
+      ui_print "Selected: noKSU"
       mv -f "$AKHOME/Image.noksu" "$AKHOME/Image"
       ;;
     2)
       ui_print " "
-      ui_print "Selected: KSU Kernel"
+      ui_print "Selected: KSU"
       mv -f "$AKHOME/Image.ksu" "$AKHOME/Image"
       ;;
   esac
