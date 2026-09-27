@@ -35,70 +35,58 @@ PATCH_VBMETA_FLAG=auto;
 # import functions/variables and setup patching - see for reference (DO NOT REMOVE)
 . tools/ak3-core.sh;
 
-# Patch only the active Qualcomm QCDT entry used by SDM450 + PMI632.
-# The stock boot image's QCDT container is preserved; only DTB index 1 is replaced.
-patch_qcdt_oc_dtb() {
-	local magic version entries entry_base offset_field size_field offset size new_size padded
-	local entry_dtb
+# Patch only the appended DTB entry used by SDM450 + PMI632.
+# Samsung's stock boot image for this device uses a legacy Android boot
+# header with three raw FDT blobs appended to the kernel payload. It does not
+# use a QCDT container. Preserve DTB 0 and DTB 2 byte-for-byte and replace
+# only DTB 1 with the OC build.
+patch_kernel_dtb_oc() {
+\tlocal source total offset dtb_size magic idx next expected_end tmp
 
-	[ -f "$AKHOME/oc-dtb" ] || return 0
-	[ -f "$SPLITIMG/dt" ] || abort "Qualcomm QCDT container not found in boot image."
+\t[ -f "$AKHOME/oc-dtb" ] || return 0
+\t[ -f "$SPLITIMG/kernel_dtb" ] || abort "Appended kernel DTB payload not found in boot image."
 
-	magic=$(od -An -tx1 -N4 "$SPLITIMG/dt" | tr -d ' \n')
-	[ "$magic" = "51434454" ] || abort "Unsupported DT container: expected QCDT."
+\tmagic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \\n')
+\t[ "$magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
+\ngrep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
 
-	version=$(od -An -tu4 -j4 -N4 "$SPLITIMG/dt" | tr -d ' \n')
-	entries=$(od -An -tu4 -j8 -N4 "$SPLITIMG/dt" | tr -d ' \n')
-	[ "$version" -ge 1 ] && [ "$version" -le 3 ] || abort "Unsupported QCDT version: $version."
-	[ "$entries" -ge 2 ] || abort "QCDT does not contain DTB index 1."
-
-	case "$version" in
-		1)
-			entry_base=32
-			offset_field=44
-			size_field=48
-			;;
-		2)
-			entry_base=36
-			offset_field=52
-			size_field=56
-			;;
-		3)
-			entry_base=52
-			offset_field=84
-			size_field=88
-			;;
-	esac
-
-	offset=$(od -An -tu4 -j"$offset_field" -N4 "$SPLITIMG/dt" | tr -d ' \n')
-	size=$(od -An -tu4 -j"$size_field" -N4 "$SPLITIMG/dt" | tr -d ' \n')
-	[ "$offset" -gt 0 ] && [ "$size" -gt 0 ] || abort "Invalid QCDT index 1 offset/size."
-	[ $((offset % 2048)) -eq 0 ] || abort "QCDT index 1 offset is not page aligned."
-	[ $((size % 2048)) -eq 0 ] || abort "QCDT index 1 size is not page aligned."
-
-	entry_dtb="$AKHOME/qcdt-entry-1.dtb"
-	dd if="$SPLITIMG/dt" of="$entry_dtb" bs=2048 skip="$((offset / 2048))" count="$((size / 2048))" >/dev/null 2>&1 		|| abort "Unable to extract QCDT index 1."
-	grep -a -q "SDM450 + PMI632 SOC" "$entry_dtb" || abort "QCDT index 1 is not SDM450 + PMI632."
-
-	local oc_magic
-	oc_magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \\n')
-	[ "$oc_magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
-	grep -a -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
-
-	new_size=$(wc -c < "$AKHOME/oc-dtb")
-	padded=$(( ((new_size + 2047) / 2048) * 2048 ))
-	[ "$padded" -le "$size" ] || abort "OC DTB is larger than QCDT index 1 slot."
-
-	cp -f "$SPLITIMG/dt" "$SPLITIMG/dt.oc"
-	dd if=/dev/zero of="$SPLITIMG/dt.oc" bs=2048 seek="$((offset / 2048))" count="$((size / 2048))" conv=notrunc >/dev/null 2>&1 		|| abort "Unable to clear QCDT index 1."
-	dd if="$AKHOME/oc-dtb" of="$SPLITIMG/dt.oc" bs=1 seek="$offset" conv=notrunc >/dev/null 2>&1 		|| abort "Unable to write OC DTB into QCDT."
-	mv -f "$SPLITIMG/dt.oc" "$SPLITIMG/dt"
-	rm -f "$entry_dtb"
+\tsource="$SPLITIMG/kernel_dtb"
+\ttotal=$(wc -c < "$source")
+\toffset=0
+\tidx=0
+\ttmp="$SPLITIMG/kernel_dtb.oc"
+\n\t: > "$tmp" || abort "Unable to create kernel DTB work file."
+\n\twhile [ "$offset" -lt "$total" ]; do
+\t\t[ $((total - offset)) -ge 8 ] || abort "Truncated kernel DTB payload."
+\n\t\tmagic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | tr -d ' \\n')
+\t\t[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at kernel DTB index $idx."
+\n\t\tset -- $(dd if="$source" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
+\t\t[ "$#" -eq 4 ] || abort "Unable to read FDT size at kernel DTB index $idx."
+\t\tdtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x$3 << 8 | 0x$4))
+\t\t[ "$dtb_size" -ge 40 ] || abort "Invalid FDT size at kernel DTB index $idx."
+\t\texpected_end=$((offset + dtb_size))
+\t\t[ "$expected_end" -le "$total" ] || abort "Kernel DTB index $idx exceeds payload bounds."
+\n\t\tcase "$idx" in
+\t\t\t1)
+\t\t\t\tif ! dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null | grep -q "SDM450 + PMI632 SOC"; then
+\t\t\t\t\tabort "Stock kernel DTB index 1 is not SDM450 + PMI632."
+\t\t\t\tfi
+\t\t\t\tcat "$AKHOME/oc-dtb" >> "$tmp" || abort "Unable to append OC DTB."
+\t\t\t\t;;
+\t\t\t*)
+\t\t\t\tdd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null >> "$tmp" || abort "Unable to preserve kernel DTB index $idx."
+\t\t\t\t;;
+\t\tesac
+\n\t\tidx=$((idx + 1))
+\t\toffset="$expected_end"
+\tdone
+\n\t[ "$idx" -ge 2 ] || abort "Kernel DTB payload does not contain DTB index 1."
+\tmv -f "$tmp" "$source" || abort "Unable to install patched kernel DTB payload."
 }
 
 # boot install
 dump_boot; # use split_boot to skip ramdisk unpack, e.g. for devices with init_boot ramdisk
-patch_qcdt_oc_dtb
+patch_kernel_dtb_oc
 write_boot; # use flash_boot to skip ramdisk repack, e.g. for devices with init_boot ramdisk
 ## end boot install
 
