@@ -38,7 +38,6 @@ PATCH_VBMETA_FLAG=auto;
 # boot install
 dump_boot; # use split_boot to skip ramdisk unpack, e.g. for devices with init_boot ramdisk
 write_boot; # use flash_boot to skip ramdisk repack, e.g. for devices with init_boot ramdisk
-l
 
 
 ## init_boot files attributes
