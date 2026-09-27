@@ -41,47 +41,57 @@ PATCH_VBMETA_FLAG=auto;
 # use a QCDT container. Preserve DTB 0 and DTB 2 byte-for-byte and replace
 # only DTB 1 with the OC build.
 patch_kernel_dtb_oc() {
-\tlocal source total offset dtb_size magic idx next expected_end tmp
+	local source total offset dtb_size magic idx next expected_end tmp
 
-\t[ -f "$AKHOME/oc-dtb" ] || return 0
-\t[ -f "$SPLITIMG/kernel_dtb" ] || abort "Appended kernel DTB payload not found in boot image."
+	[ -f "$AKHOME/oc-dtb" ] || return 0
+	[ -f "$SPLITIMG/kernel_dtb" ] || abort "Appended kernel DTB payload not found in boot image."
 
-\tmagic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \\n')
-\t[ "$magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
-\ngrep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
+	magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \
+')
+	[ "$magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
 
-\tsource="$SPLITIMG/kernel_dtb"
-\ttotal=$(wc -c < "$source")
-\toffset=0
-\tidx=0
-\ttmp="$SPLITIMG/kernel_dtb.oc"
-\n\t: > "$tmp" || abort "Unable to create kernel DTB work file."
-\n\twhile [ "$offset" -lt "$total" ]; do
-\t\t[ $((total - offset)) -ge 8 ] || abort "Truncated kernel DTB payload."
-\n\t\tmagic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | tr -d ' \\n')
-\t\t[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at kernel DTB index $idx."
-\n\t\tset -- $(dd if="$source" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
-\t\t[ "$#" -eq 4 ] || abort "Unable to read FDT size at kernel DTB index $idx."
-\t\tdtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x$3 << 8 | 0x$4))
-\t\t[ "$dtb_size" -ge 40 ] || abort "Invalid FDT size at kernel DTB index $idx."
-\t\texpected_end=$((offset + dtb_size))
-\t\t[ "$expected_end" -le "$total" ] || abort "Kernel DTB index $idx exceeds payload bounds."
-\n\t\tcase "$idx" in
-\t\t\t1)
-\t\t\t\tif ! dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null | grep -q "SDM450 + PMI632 SOC"; then
-\t\t\t\t\tabort "Stock kernel DTB index 1 is not SDM450 + PMI632."
-\t\t\t\tfi
-\t\t\t\tcat "$AKHOME/oc-dtb" >> "$tmp" || abort "Unable to append OC DTB."
-\t\t\t\t;;
-\t\t\t*)
-\t\t\t\tdd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null >> "$tmp" || abort "Unable to preserve kernel DTB index $idx."
-\t\t\t\t;;
-\t\tesac
-\n\t\tidx=$((idx + 1))
-\t\toffset="$expected_end"
-\tdone
-\n\t[ "$idx" -ge 2 ] || abort "Kernel DTB payload does not contain DTB index 1."
-\tmv -f "$tmp" "$source" || abort "Unable to install patched kernel DTB payload."
+grep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
+
+	source="$SPLITIMG/kernel_dtb"
+	total=$(wc -c < "$source")
+	offset=0
+	idx=0
+	tmp="$SPLITIMG/kernel_dtb.oc"
+
+	: > "$tmp" || abort "Unable to create kernel DTB work file."
+
+	while [ "$offset" -lt "$total" ]; do
+		[ $((total - offset)) -ge 8 ] || abort "Truncated kernel DTB payload."
+
+		magic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | tr -d ' \
+')
+		[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at kernel DTB index $idx."
+
+		set -- $(dd if="$source" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
+		[ "$#" -eq 4 ] || abort "Unable to read FDT size at kernel DTB index $idx."
+		dtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x$3 << 8 | 0x$4))
+		[ "$dtb_size" -ge 40 ] || abort "Invalid FDT size at kernel DTB index $idx."
+		expected_end=$((offset + dtb_size))
+		[ "$expected_end" -le "$total" ] || abort "Kernel DTB index $idx exceeds payload bounds."
+
+		case "$idx" in
+			1)
+				if ! dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null | grep -q "SDM450 + PMI632 SOC"; then
+					abort "Stock kernel DTB index 1 is not SDM450 + PMI632."
+				fi
+				cat "$AKHOME/oc-dtb" >> "$tmp" || abort "Unable to append OC DTB."
+				;;
+			*)
+				dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null >> "$tmp" || abort "Unable to preserve kernel DTB index $idx."
+				;;
+		esac
+
+		idx=$((idx + 1))
+		offset="$expected_end"
+	done
+
+	[ "$idx" -ge 2 ] || abort "Kernel DTB payload does not contain DTB index 1."
+	mv -f "$tmp" "$source" || abort "Unable to install patched kernel DTB payload."
 }
 
 # boot install
