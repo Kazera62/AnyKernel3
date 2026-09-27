@@ -41,56 +41,96 @@ PATCH_VBMETA_FLAG=auto;
 # use a QCDT container. Preserve DTB 0 and DTB 2 byte-for-byte and replace
 # only DTB 1 with the OC build.
 patch_kernel_dtb_oc() {
-	local source total offset dtb_size magic idx expected_end tmp
+	local candidate total offset dtb_size magic idx expected_end tmp found
+	local source
 
 	[ -f "$AKHOME/oc-dtb" ] || return 0
-	[ -f "$SPLITIMG/kernel_dtb" ] || abort "Appended kernel DTB payload not found in boot image."
 
 	magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | sed 's/[[:space:]]//g')
 	[ "$magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
+	if ! grep -a -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb"; then
+		abort "OC DTB model mismatch."
+	fi
 
-grep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
+	source=""
+	# Samsung M11/A11 legacy boot images expose the DT payload as "dtb".
+	# Keep kernel_dtb/extra as compatibility fallbacks for other unpack paths.
+	for candidate in "$SPLITIMG/dtb" "$SPLITIMG/kernel_dtb" "$SPLITIMG/extra"; do
+		[ -f "$candidate" ] || continue
+		magic=$(od -An -tx1 -N4 "$candidate" | sed 's/[[:space:]]//g')
+		[ "$magic" = "d00dfeed" ] || continue
 
-	source="$SPLITIMG/kernel_dtb"
+		total=$(wc -c < "$candidate")
+		offset=0
+		idx=0
+		found=0
+
+		while [ "$offset" -lt "$total" ]; do
+			[ $((total - offset)) -ge 8 ] || break
+
+			magic=$(dd if="$candidate" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
+			[ "$magic" = "d00dfeed" ] || break
+
+			set -- $(dd if="$candidate" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
+			[ "$#" -eq 4 ] || break
+			dtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x3 << 8 | 0x4))
+			[ "$dtb_size" -ge 40 ] || break
+			expected_end=$((offset + dtb_size))
+			[ "$expected_end" -le "$total" ] || break
+
+			if [ "$idx" -eq 1 ]; then
+				if dd if="$candidate" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null | grep -a -q "SDM450 + PMI632 SOC"; then
+					found=1
+				fi
+				break
+			fi
+
+			idx=$((idx + 1))
+			offset="$expected_end"
+		done
+
+		if [ "$found" -eq 1 ]; then
+			source="$candidate"
+			break
+		fi
+	done
+
+	[ -n "$source" ] || abort "SDM450 + PMI632 DTB entry not found in unpacked boot image."
+
 	total=$(wc -c < "$source")
 	offset=0
 	idx=0
-	tmp="$SPLITIMG/kernel_dtb.oc"
+	tmp="$source.oc"
 
-	: > "$tmp" || abort "Unable to create kernel DTB work file."
+	: > "$tmp" || abort "Unable to create DTB work file."
 
 	while [ "$offset" -lt "$total" ]; do
-		[ $((total - offset)) -ge 8 ] || abort "Truncated kernel DTB payload."
+		[ $((total - offset)) -ge 8 ] || abort "Truncated DTB payload."
 
 		magic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
-		[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at kernel DTB index $idx."
+		[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at DTB index $idx."
 
 		set -- $(dd if="$source" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
-		[ "$#" -eq 4 ] || abort "Unable to read FDT size at kernel DTB index $idx."
+		[ "$#" -eq 4 ] || abort "Unable to read FDT size at DTB index $idx."
 		dtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x$3 << 8 | 0x$4))
-		[ "$dtb_size" -ge 40 ] || abort "Invalid FDT size at kernel DTB index $idx."
+		[ "$dtb_size" -ge 40 ] || abort "Invalid FDT size at DTB index $idx."
 		expected_end=$((offset + dtb_size))
-		[ "$expected_end" -le "$total" ] || abort "Kernel DTB index $idx exceeds payload bounds."
+		[ "$expected_end" -le "$total" ] || abort "DTB index $idx exceeds payload bounds."
 
-		case "$idx" in
-			1)
-				if ! dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null | grep -q "SDM450 + PMI632 SOC"; then
-					abort "Stock kernel DTB index 1 is not SDM450 + PMI632."
-				fi
-				cat "$AKHOME/oc-dtb" >> "$tmp" || abort "Unable to append OC DTB."
-				;;
-			*)
-				dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null >> "$tmp" || abort "Unable to preserve kernel DTB index $idx."
-				;;
-		esac
+		if [ "$idx" -eq 1 ]; then
+			cat "$AKHOME/oc-dtb" >> "$tmp" || abort "Unable to append OC DTB."
+		else
+			dd if="$source" bs=1 skip="$offset" count="$dtb_size" 2>/dev/null >> "$tmp" || abort "Unable to preserve DTB index $idx."
+		fi
 
 		idx=$((idx + 1))
 		offset="$expected_end"
 	done
 
-	[ "$idx" -ge 2 ] || abort "Kernel DTB payload does not contain DTB index 1."
-	mv -f "$tmp" "$source" || abort "Unable to install patched kernel DTB payload."
+	[ "$idx" -ge 2 ] || abort "DTB payload does not contain DTB index 1."
+	mv -f "$tmp" "$source" || abort "Unable to install patched DTB payload."
 }
+
 
 # boot install
 dump_boot; # use split_boot to skip ramdisk unpack, e.g. for devices with init_boot ramdisk
