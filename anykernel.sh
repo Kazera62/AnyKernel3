@@ -41,13 +41,12 @@ PATCH_VBMETA_FLAG=auto;
 # use a QCDT container. Preserve DTB 0 and DTB 2 byte-for-byte and replace
 # only DTB 1 with the OC build.
 patch_kernel_dtb_oc() {
-	local source total offset dtb_size magic idx next expected_end tmp
+	local source total offset dtb_size magic idx expected_end tmp
 
 	[ -f "$AKHOME/oc-dtb" ] || return 0
 	[ -f "$SPLITIMG/kernel_dtb" ] || abort "Appended kernel DTB payload not found in boot image."
 
-	magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \
-')
+	magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | sed 's/[[:space:]]//g')
 	[ "$magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
 
 grep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
@@ -63,8 +62,7 @@ grep -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
 	while [ "$offset" -lt "$total" ]; do
 		[ $((total - offset)) -ge 8 ] || abort "Truncated kernel DTB payload."
 
-		magic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | tr -d ' \
-')
+		magic=$(dd if="$source" bs=1 skip="$offset" count=4 2>/dev/null | od -An -tx1 | sed 's/[[:space:]]//g')
 		[ "$magic" = "d00dfeed" ] || abort "Invalid FDT magic at kernel DTB index $idx."
 
 		set -- $(dd if="$source" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
