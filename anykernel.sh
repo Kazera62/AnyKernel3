@@ -73,7 +73,7 @@ patch_kernel_dtb_oc() {
 
 			set -- $(dd if="$candidate" bs=1 skip=$((offset + 4)) count=4 2>/dev/null | od -An -tx1)
 			[ "$#" -eq 4 ] || break
-			dtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x3 << 8 | 0x4))
+			dtb_size=$((0x$1 << 24 | 0x$2 << 16 | 0x$3 << 8 | 0x$4))
 			[ "$dtb_size" -ge 40 ] || break
 			expected_end=$((offset + dtb_size))
 			[ "$expected_end" -le "$total" ] || break
