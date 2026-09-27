@@ -80,8 +80,10 @@ patch_qcdt_oc_dtb() {
 	dd if="$SPLITIMG/dt" of="$entry_dtb" bs=2048 skip="$((offset / 2048))" count="$((size / 2048))" >/dev/null 2>&1 		|| abort "Unable to extract QCDT index 1."
 	grep -a -q "SDM450 + PMI632 SOC" "$entry_dtb" || abort "QCDT index 1 is not SDM450 + PMI632."
 
-	grep -a -q "$(printf '\\xd0\\x0d\\xfe\\xed')" "$AKHOME/oc-dtb" 		|| abort "OC DTB is not a valid flattened device tree."
-	grep -a -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" 		|| abort "OC DTB model mismatch."
+	local oc_magic
+	oc_magic=$(od -An -tx1 -N4 "$AKHOME/oc-dtb" | tr -d ' \\n')
+	[ "$oc_magic" = "d00dfeed" ] || abort "OC DTB is not a valid flattened device tree."
+	grep -a -q "SDM450 + PMI632 SOC" "$AKHOME/oc-dtb" || abort "OC DTB model mismatch."
 
 	new_size=$(wc -c < "$AKHOME/oc-dtb")
 	padded=$(( ((new_size + 2047) / 2048) * 2048 ))
