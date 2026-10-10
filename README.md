@@ -20,7 +20,7 @@ The tracked `anykernel.sh` is configured directly for this device family:
 - Uses `IS_SLOT_DEVICE=0` for the non-A/B partition layout.
 - Keeps device verification enabled.
 - Supports optional kernel-module installation when modules are included in the ZIP.
-- Does not contain the Galaxy Nexus `tuna` partition path or tuna-specific `init.rc` / `fstab` edits.
+- Does not apply device-specific ramdisk modifications.
 
 The upstream build workflow clones this repository at build time and packages the installer as-is. Device-specific installer configuration is maintained here, not patched by the kernel build workflow.
 
