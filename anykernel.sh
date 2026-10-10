@@ -36,7 +36,7 @@ PATCH_VBMETA_FLAG=auto;
 . tools/ak3-core.sh;
 
 # Boot image install.
-# No Galaxy Nexus/tuna-specific ramdisk edits are applied.
+# No device-specific ramdisk edits are applied.
 dump_boot;
 write_boot;
 ## end boot install
