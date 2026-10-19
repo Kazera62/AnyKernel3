@@ -6,8 +6,6 @@
 properties() { '
 kernel.string=NOCTURNE // SDM450
 do.devicecheck=1
-# This ZIP only flashes the boot image; no .ko or helper-module payload is packaged.
-# Avoid probing /data in recovery for an optional systemless helper module.
 do.modules=0
 do.systemless=0
 do.cleanup=1
